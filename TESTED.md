@@ -1,42 +1,29 @@
 # Validation record — 2026-10-12
 
-## Verified locally on the comparison rewrite
+## Managed Azure result
 
-- macOS arm64, patched .NET SDK 10.0.401 / target net10.0.
-- Locked no-HTTP-cache restore and Release build: zero warnings/errors.
-- 147 offline .NET cases pass, zero skipped. Fourteen audit-helper tests pass.
-- Current NuGet.org feed audit of both app and test graphs, direct + transitive:
-  no vulnerabilities reported on this date. The fail-closed helper checks feed errors.
-- Fixture validation against the pinned shared 50 × 1536 dataset: first-record
-  query/K=5 and a different record query/K=2 produce different canonical query hashes
-  and expected top IDs for COS/L2/IP. No database/model connection occurred.
-- CLI unknown/removed configuration and missing configuration with EOF exit nonzero.
-- Explicit live test selection without flags/environment: **18 failures, zero skips**,
-  before network/database writes. This is a negative guard test, not a live pass.
-- Offline tests cover failure-first/middle/last continuation, nine-case summaries,
-  variable query/K, query/score oracle, malformed responses/vectors/writes, full
-  index catalog conflicts (including hidden/unique/sparse/partial/TTL), preservation,
-  exact-host-before-token construction, TLS, SCRAM and real driver OIDC callback
-  contract/audience/expiry, and credential-free sanitized error output.
+**18/18 algorithm/authentication cases passed** on a disposable managed Azure DocumentDB M30 in West US2, one shard, MongoDB8.0 compatibility,128GiB storage and high availability disabled. The matrix is IVF/HNSW/DiskANN × COS/L2/IP, repeated under native SCRAM-SHA-256 and Microsoft Entra OIDC with verified TLS and a client-IP firewall.
 
-## Not yet validated for this repository/revision
+Tested implementation: `d75406ff82a58fecc78c3e75b2d37a14433ee5e0`. The later commit containing this record changes only documentation.
 
-**No managed-Azure service run has been performed for this comparison candidate.**
-All 18 auth × algorithm × metric release cases remain a parent/operator-owned gate.
-Prior public vector-sample evidence is attribution/design input, not live proof of
-this rewrite. Local fakes do not prove Azure authentication, index support or service
-query results. Azure resources, cleanup, push/PR/merge and visibility are outside
-this validation record.
+The fixture contains50pinned public hotel records with1536-dimensional precomputed vectors; the query is the first stored vector. Actual index definitions were checked. Every case returned five results checked against a numeric reference appropriate to its metric; raw scores from different metrics are not comparable. This is not a semantic-quality, latency/throughput, production-size ANN or service-tier support benchmark.
 
-The required gate is documented in README: real SCRAM and real Entra OIDC on an
-approved tier, all nine cases each, catalog/preservation/rerun checks, independent
-JSON rank/score assertions, plus a changed query/TopK run. Retain sanitized evidence
-against the exact commit before changing this status.
+Actual command-line execution and repeat runs were checked, not merely client construction. Repeated seeding inserted zero duplicates. An unrelated sentinel survived in every exercised collection. Existing user edits were preserved by insert-only seeding or safely refused as a fixture conflict; no test path dropped/reset/replaced existing data or indexes.
 
-Model inference was deliberately removed; no Azure OpenAI deployment, S0 capability,
-semantic quality, large-scale recall/performance or production suitability is claimed.
+Each CLI also rejected disabled write consent, a system database target, a foreign host and an incorrect native password with a nonzero exit and without printing credentials. No model calls or Azure OpenAI account were required.
 
-## Publication-review corrections
+## Query configuration proof
 
-- Unsafe ordinary-index flags are checked before unrelated-index continuation; only the genuine `_id_` index may be unique. Before/after-catalog regressions prove zero inserts or index creation.
-- NuGet advisory/package/error schemas are validated at every response level; missing `vulnerabilities` and empty package lists remain legitimate clean responses, while malformed falsey fields and nested errors fail. Final local counts above and current-feed audits were rerun after these fixes.
+The18-case permanent live suite included edited-record and unrelated-document canaries, actual catalogs, metric rank/score checks and idempotence. A separate actual OIDC CLI run changed QUERY_VECTOR_FILE to Hotel28's vector and VectorSearch__TopK to2: all9cases returned2matches, a changed query digest, Hotel28 first, and metric-correct ranks/scores verified independently. Removed legacy text-query keys fail explicitly; they are not ignored.
+
+## Local checks
+
+.NET SDK10.0.401/runtime10.0.12.147 offline .NET tests and14advisory-helper tests pass; locked Release build has zero warnings/errors. Current NuGet direct/transitive audits report no findings; malformed/error-bearing responses fail closed. Selected live mode without authorization/config fails18cases instead of skipping.
+
+Full repository history and tracked publication files were scanned for secrets with no matches. MIT licensing and pinned upstream provenance remain. Scans are point-in-time findings, not a guarantee of absolute security. CI uses pinned GitHub-owned actions, read-only permissions and no cloud credentials or deployment steps.
+
+## Scope and cleanup
+
+This repository supports precomputed database/vector workflows only; live embedding/model generation was removed rather than falsely advertised as tested. The available subscription's model-service eligibility is not needed by the quickstart. No model-backed end-to-end, high availability, backup recovery, production capacity or broader cloud support is claimed.
+
+Testing used isolated disposable namespaces, not existing customer data. Environment owners are responsible for deliberately removing their test resources; the sample never automatically deletes databases/collections/indexes. The release operator verifies deletion of the shared test resource group and hosted CI before publication. No credentials, subscription identifiers or private infrastructure details are included here.
