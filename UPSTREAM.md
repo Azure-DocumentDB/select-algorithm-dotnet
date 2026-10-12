@@ -32,3 +32,27 @@ application code, dependency versions, or `appsettings.json` defaults were chang
 
 There is no automatic synchronization. Review upstream changes against this pinned baseline, apply only relevant fixes, retain notices, and record the imported revision and local adaptations here.
 Issue/PR history is not transferred. The maintainers of the repository hosting this extraction own its downstream fixes; contribute reusable fixes upstream under its contribution policy.
+
+## Safety/comparison rewrite (2026-10-12)
+
+The previous paragraphs describe the original extraction, not the current behavior.
+This revision intentionally changes dependencies and the application architecture:
+
+- Attributed safety foundation reused/adapted from the **public** MIT-licensed
+  [Azure-DocumentDB/vector-search-dotnet](https://github.com/Azure-DocumentDB/vector-search-dotnet)
+  at [23dc450a1ed6aaed70078fd89378b7ade188e4f1](https://github.com/Azure-DocumentDB/vector-search-dotnet/commit/23dc450a1ed6aaed70078fd89378b7ade188e4f1),
+  tree `8f9a2e4688c6d19971dc40bcd2c6ff514f21cd9b`.
+  Its underlying Microsoft MIT provenance is preserved in LICENSE.md.
+- Adapted files/concepts: configuration/namespace guards, Fixture/MongoDbService/
+  VectorSearchService, ClientFactory/AzureIdentityTokenHandler, test doubles and
+  safety/live tests, patched SDK/dependency locks, data/audit helpers and read-only CI.
+- Original comparison algorithm identities and metrics remain, but collections are
+  isolated per algorithm, metric and auth mode. All drops/updates/reset cleanup are
+  removed. Insert-only preservation, full catalog checks, all-case failure reporting
+  and metric-correct fixture score/rank validation replace optimistic success logic.
+- Removed Azure OpenAI/query text workflow and its dependency. User-provided
+  precomputed query files are genuinely searched; documented VectorSearch__TopK is
+  honored. Removed configuration keys fail fast and are documented in README.
+- Target .NET 10.0, SDK 10.0.401; Azure.Identity 1.21.0, MongoDB.Driver 3.12.0.
+  Both app/test transitive graphs locked; explicit current-feed audit helper added.
+- Local tests are not managed-Azure proof. See TESTED.md for the evidence boundary.
