@@ -81,7 +81,13 @@ public static class VectorSchema
                 throw new IndexConflictException();
             var sameName = name == expected["name"];
             var vector = key.AsBsonDocument.Elements.Any(e => e.Value == "cosmosSearch");
-            if (!sameName && !vector) continue; // unrelated ordinary indexes are preserved, including unique indexes
+            // Hazardous semantics affect inserts/retention even on unrelated fields.
+            var genuineIdIndex = name == "_id_" && key == new BsonDocument("_id", 1);
+            if ((!IsFalseOrAbsent(actual, "unique") && !(genuineIdIndex && actual["unique"].IsBoolean && actual["unique"].AsBoolean)) ||
+                !IsFalseOrAbsent(actual, "sparse") || !IsFalseOrAbsent(actual, "hidden") ||
+                actual.Contains("partialFilterExpression") || actual.Contains("expireAfterSeconds") || actual.Contains("collation"))
+                throw new IndexConflictException();
+            if (!sameName && !vector) continue; // only harmless unrelated indexes survive the complete safety check
             if (found || !sameName || !IsFalseOrAbsent(actual, "unique") || !IsFalseOrAbsent(actual, "sparse") ||
                 !IsFalseOrAbsent(actual, "hidden") || actual.Contains("partialFilterExpression") || actual.Contains("expireAfterSeconds") ||
                 actual.Contains("collation") || key != expected["key"] ||

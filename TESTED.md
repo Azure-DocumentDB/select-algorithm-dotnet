@@ -4,7 +4,7 @@
 
 - macOS arm64, patched .NET SDK 10.0.401 / target net10.0.
 - Locked no-HTTP-cache restore and Release build: zero warnings/errors.
-- 126 offline .NET cases pass, zero skipped. Eight audit-helper tests pass.
+- 147 offline .NET cases pass, zero skipped. Fourteen audit-helper tests pass.
 - Current NuGet.org feed audit of both app and test graphs, direct + transitive:
   no vulnerabilities reported on this date. The fail-closed helper checks feed errors.
 - Fixture validation against the pinned shared 50 × 1536 dataset: first-record
@@ -35,3 +35,8 @@ against the exact commit before changing this status.
 
 Model inference was deliberately removed; no Azure OpenAI deployment, S0 capability,
 semantic quality, large-scale recall/performance or production suitability is claimed.
+
+## Publication-review corrections
+
+- Unsafe ordinary-index flags are checked before unrelated-index continuation; only the genuine `_id_` index may be unique. Before/after-catalog regressions prove zero inserts or index creation.
+- NuGet advisory/package/error schemas are validated at every response level; missing `vulnerabilities` and empty package lists remain legitimate clean responses, while malformed falsey fields and nested errors fail. Final local counts above and current-feed audits were rerun after these fixes.

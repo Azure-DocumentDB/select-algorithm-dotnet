@@ -104,9 +104,34 @@ public class WorkflowTests
     {
         var expected = VectorSchema.Index(Case); var actual = expected.DeepClone().AsBsonDocument;
         actual["unique"] = false; actual["sparse"] = false; actual["hidden"] = false;
-        var ordinary = new BsonDocument { ["name"] = "user_unique", ["key"] = new BsonDocument("HotelName", 1), ["unique"] = true };
+        var ordinary = new BsonDocument { ["name"] = "user_ordinary", ["key"] = new BsonDocument("HotelName", 1) };
         Assert.True(VectorSchema.CheckCatalog([actual, ordinary], expected));
     }
+    public static IEnumerable<object[]> UnsafeOrdinaryCases =>
+        new[] { "unique", "sparse", "hidden", "partialFilterExpression", "expireAfterSeconds" }
+        .SelectMany(option => new[] { false, true }.SelectMany(before => new[] { false, true }.Select(malformed =>
+            new object[] { option, before, malformed })));
+    [Theory, MemberData(nameof(UnsafeOrdinaryCases))]
+    public async Task UnsafeUnrelatedIndexesFailBeforeAnyInsert(string option, bool before, bool malformed)
+    {
+        var unsafeIndex = new BsonDocument { ["name"] = "user_index", ["key"] = new BsonDocument("HotelName", 1) };
+        unsafeIndex[option] = malformed ? new BsonString("false") : option == "expireAfterSeconds" ? new BsonInt32(0) : BsonBoolean.True;
+        var expected = VectorSchema.Index(Case); var fake = new FakeStore();
+        fake.Indexes.AddRange(before ? [unsafeIndex, expected] : [expected, unsafeIndex]);
+        await Assert.ThrowsAsync<IndexConflictException>(() => new VectorSearchService(fake).RunAsync(Case, SyntheticFixture(), 5, true, default));
+        Assert.Empty(fake.Documents); Assert.Equal(0, fake.CreateCalls); Assert.Null(fake.LastPipeline);
+    }
+    [Fact] public void OnlyGenuineIdIndexGetsUniqueException()
+    {
+        var expected = VectorSchema.Index(Case);
+        var id = new BsonDocument { ["name"] = "_id_", ["key"] = new BsonDocument("_id", 1), ["unique"] = true };
+        Assert.True(VectorSchema.CheckCatalog([id, expected], expected));
+        id["unique"] = "true";
+        Assert.Throws<IndexConflictException>(() => VectorSchema.CheckCatalog([id, expected], expected));
+        id["unique"] = true; id["key"] = new BsonDocument("HotelName", 1);
+        Assert.Throws<IndexConflictException>(() => VectorSchema.CheckCatalog([id, expected], expected));
+    }
+
     [Fact] public async Task CreatedIndexMustActuallyAppearInCatalog() => await Assert.ThrowsAsync<VerificationException>(() =>
         new VectorSearchService(new FakeStore { HideCreatedIndex = true }).RunAsync(Case, SyntheticFixture(), 5, true, default));
     [Fact] public async Task SearchFailuresPropagate() => await Assert.ThrowsAsync<InvalidOperationException>(() =>

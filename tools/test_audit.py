@@ -51,6 +51,48 @@ class AuditTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit.validate(report)
 
+    def package_report(self, package, group='transitivePackages'):
+        report = self.clean(); report['projects'][0]['frameworks'][0][group] = [package]
+        return report
+
+    def test_missing_vulnerabilities_is_valid(self):
+        audit.validate(self.package_report({'id': 'Example.Package', 'resolvedVersion': '1.2.3'}))
+        audit.validate(self.package_report({'id': 'Example.Package', 'resolvedVersion': '1.2.3', 'requestedVersion': '[1.0.0, )', 'vulnerabilities': []}, 'topLevelPackages'))
+
+    def test_package_errors_rejected(self):
+        for key, value in [('problems', ['feed failure']), ('error', {'code': 503}), ('status', 503), ('errors', []), ('problems', None)]:
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                audit.validate(self.package_report({'id': 'x', 'resolvedVersion': '1.0.0', key: value}))
+
+    def test_falsey_malformed_vulnerability_lists(self):
+        for value in (None, {}, False, '', 0):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                audit.validate(self.package_report({'id': 'x', 'resolvedVersion': '1.0.0', 'vulnerabilities': value}))
+
+    def test_package_identity_version_schema(self):
+        for package in (None, [], {}, {'id': 'x'}, {'id': False, 'resolvedVersion': '1.0.0'},
+                        {'id': 'x', 'resolvedVersion': ''}, {'id': 'x', 'resolvedVersion': False},
+                        {'id': 'x', 'resolvedVersion': 'not-a-version'}):
+            with self.subTest(package=package), self.assertRaises(ValueError):
+                audit.validate(self.package_report(package))
+        with self.assertRaises(ValueError):
+            audit.validate(self.package_report({'id': 'x', 'resolvedVersion': '1.0.0'}, 'topLevelPackages'))
+
+    def test_advisory_schema_and_actual_findings(self):
+        for entry in (None, {}, {'severity': 'Low'}, {'severity': False, 'advisoryurl': 'https://example.test/advisory'},
+                      {'severity': 'Low', 'advisoryurl': False}, {'severity': 'Low', 'advisoryurl': 'not-a-url'},
+                      {'severity': 'Low', 'advisoryurl': 'https://example.test/advisory'}):
+            with self.subTest(entry=entry), self.assertRaises(ValueError):
+                audit.validate(self.package_report({'id': 'x', 'resolvedVersion': '1.0.0', 'vulnerabilities': [entry]}))
+
+    def test_errors_at_every_object_level(self):
+        for level in ('report', 'project', 'framework'):
+            report = self.clean()
+            target = report if level == 'report' else report['projects'][0] if level == 'project' else report['projects'][0]['frameworks'][0]
+            target['error'] = {'code': 503}
+            with self.subTest(level=level), self.assertRaises(ValueError):
+                audit.validate(report)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,30 +1,66 @@
 #!/usr/bin/env python3
 """Fail closed on NuGet advisory results, including transitives (list itself exits 0 on findings)."""
 import json
+import re
+from urllib.parse import urlparse
 import subprocess
 import sys
 
 
-def validate(report):
-    if (report.get('version') != 1 or not isinstance(report.get('projects'), list)
-            or len(report['projects']) != 1 or report.get('sources') != ['https://api.nuget.org/v3/index.json']):
-        raise ValueError('Incomplete NuGet advisory response')
-    if report.get('problems'):
+def object_shape(value, allowed, required):
+    if not isinstance(value, dict) or not required <= value.keys() or value.keys() - allowed:
+        raise ValueError('Malformed or error-bearing NuGet object')
+    if 'problems' in value and (not isinstance(value['problems'], list) or value['problems']):
         raise ValueError('NuGet advisory query reported problems')
+
+
+def text(value):
+    return isinstance(value, str) and bool(value.strip())
+
+
+def validate_package(package, top_level):
+    required = {'id', 'resolvedVersion'} | ({'requestedVersion'} if top_level else set())
+    object_shape(package, {'id', 'resolvedVersion', 'requestedVersion', 'autoReferenced', 'vulnerabilities', 'problems'}, required)
+    if (not text(package['id']) or not re.fullmatch(r'[A-Za-z0-9_.-]+', package['id'])
+            or not text(package['resolvedVersion']) or not re.fullmatch(r'\d+\.\d+\.\d+(?:[.+-][0-9A-Za-z.-]+)?', package['resolvedVersion'])
+            or ('requestedVersion' in package and not text(package['requestedVersion']))
+            or ('autoReferenced' in package and not isinstance(package['autoReferenced'], bool))):
+        raise ValueError('Malformed NuGet package identity/version')
+    # Missing vulnerabilities is legitimately no findings; present falsey non-lists are not.
+    advisories = package.get('vulnerabilities', [])
+    if not isinstance(advisories, list):
+        raise ValueError('Malformed vulnerability list')
+    for advisory in advisories:
+        object_shape(advisory, {'severity', 'advisoryurl'}, {'severity', 'advisoryurl'})
+        if advisory['severity'] not in ('Low', 'Moderate', 'High', 'Critical') or not text(advisory['advisoryurl']):
+            raise ValueError('Malformed vulnerability entry')
+        url = urlparse(advisory['advisoryurl'])
+        if url.scheme != 'https' or not url.netloc:
+            raise ValueError('Malformed advisory URL')
+    if advisories:
+        raise ValueError('Vulnerable NuGet dependency detected')
+
+
+def validate(report):
+    object_shape(report, {'version', 'parameters', 'sources', 'projects', 'problems'}, {'version', 'sources', 'projects'})
+    if (type(report['version']) is not int or report['version'] != 1 or not isinstance(report['projects'], list)
+            or len(report['projects']) != 1 or report['sources'] != ['https://api.nuget.org/v3/index.json']
+            or ('parameters' in report and not text(report['parameters']))):
+        raise ValueError('Incomplete NuGet advisory response')
     for project in report['projects']:
-        if not project.get('path') or not project.get('frameworks') or project.get('problems'):
+        object_shape(project, {'path', 'frameworks', 'problems'}, {'path', 'frameworks'})
+        if not text(project['path']) or not isinstance(project['frameworks'], list) or not project['frameworks']:
             raise ValueError('Incomplete project advisory response')
         for framework in project['frameworks']:
-            if (framework.get('framework') != 'net10.0' or framework.get('problems')
-                    or not isinstance(framework.get('topLevelPackages'), list)):
+            object_shape(framework, {'framework', 'topLevelPackages', 'transitivePackages', 'problems'}, {'framework', 'topLevelPackages'})
+            if framework['framework'] != 'net10.0' or not isinstance(framework['topLevelPackages'], list):
                 raise ValueError('Incomplete framework advisory response')
             for group in ('topLevelPackages', 'transitivePackages'):
                 packages = framework.get(group, [])
                 if not isinstance(packages, list):
                     raise ValueError('Malformed advisory packages')
                 for package in packages:
-                    if package.get('vulnerabilities'):
-                        raise ValueError('Vulnerable NuGet dependency detected')
+                    validate_package(package, group == 'topLevelPackages')
 
 
 def main():
